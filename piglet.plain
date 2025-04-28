@@ -1,0 +1,14 @@
+{% include "python-console-app-template.plain", main_executable_file_name: "piglet.py" %}
+
+#  Piglet example
+
+***Definitions:***
+
+- The Text File is a file containing the text that needs to be processed.
+
+
+***Functional Requirements:***
+
+- The App should take a file name of The Text File as the only positional argument.
+
+- The App should load The Text File and replace all occurances of backyard animals with the word "piglet" and output the updated text to the standard output.
