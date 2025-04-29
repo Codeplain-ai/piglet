@@ -1,0 +1,17 @@
+{
+    "1.1": {
+        "functional_requirement": "- Implement the entry point for The App.",
+        "folder_name": "conformance_tests/app_entry_point"
+    },
+    "2.1": {
+        "functional_requirement": "- The App should take a file name of The Text File as the only positional argument.",
+        "folder_name": "conformance_tests/file_handling"
+    },
+    "2.2": {
+        "functional_requirement": "- The App should load The Text File and replace all occurances of barnyard animals with the word \"piglet\" and output the updated text to the standard output. The plural forms of the barnyard animals should be replaced with the word \"piglets\".",
+        "folder_name": "conformance_tests/text_transformation",
+        "acceptance_tests": [
+            "* Acceptance test 1: If the original animal is capitalized, the replacement should be\n  capitalized. Similarly if the original is all-caps, the replacement should\n  be all-caps."
+        ]
+    }
+}
