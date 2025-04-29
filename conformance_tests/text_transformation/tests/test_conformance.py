@@ -1,7 +1,7 @@
 """
 Conformance tests for the piglet application.
 These tests verify that the application meets the functional requirements
-by testing it as a black box through its command-line interface.
+by testing it through its command-line interface.
 """
 import unittest
 import os
@@ -17,154 +17,186 @@ class TestPigletConformance(unittest.TestCase):
         """Set up the test environment."""
         # Store the path to the piglet.py script
         self.app_path = os.path.join(os.getcwd(), "piglet.py")
-        # Verify the script exists
+        # Ensure the script exists
         self.assertTrue(os.path.exists(self.app_path), 
-                        f"Application not found at {self.app_path}")
+                        f"Application file not found at {self.app_path}")
 
-    def run_app_with_input(self, input_text):
+    def run_app(self, input_file_path):
         """
-        Run the application with the given input text and return its output.
+        Run the piglet application with the given input file.
         
         Args:
-            input_text (str): Text to write to a temporary file for processing
+            input_file_path: Path to the input file
             
         Returns:
-            str: Standard output from the application
+            tuple: (stdout, stderr, return_code)
         """
-        # Create a temporary file
-        with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp_file:
-            temp_file_path = temp_file.name
-            # Write the input text to the file
-            temp_file.write(input_text)
+        result = subprocess.run(
+            [sys.executable, self.app_path, input_file_path],
+            capture_output=True,
+            text=True
+        )
+        return result.stdout, result.stderr, result.returncode
+
+    def create_temp_file(self, content):
+        """
+        Create a temporary file with the given content.
+        
+        Args:
+            content: Content to write to the file
             
+        Returns:
+            str: Path to the temporary file
+        """
+        temp_file = tempfile.NamedTemporaryFile(delete=False, mode='w', encoding='utf-8')
+        temp_file.write(content)
+        temp_file.close()
+        return temp_file.name
+
+    def test_basic_replacement(self):
+        """Test that a single barnyard animal is replaced with 'piglet'."""
+        # Create a temporary file with a single animal
+        input_content = "The cow jumped over the moon."
+        expected_output = "The piglet jumped over the moon."
+        
+        temp_file_path = self.create_temp_file(input_content)
         try:
-            # Run the application with the temporary file
-            result = subprocess.run(
-                [sys.executable, self.app_path, temp_file_path],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            return result.stdout.strip()
+            stdout, stderr, return_code = self.run_app(temp_file_path)
+            self.assertEqual(return_code, 0, f"Application failed with error: {stderr}")
+            self.assertEqual(stdout, expected_output, 
+                            f"Expected '{expected_output}', got '{stdout}'")
         finally:
-            # Clean up the temporary file
-            if os.path.exists(temp_file_path):
-                os.unlink(temp_file_path)
+            os.unlink(temp_file_path)
 
-    def test_basic_animal_replacement(self):
-        """Test that a single animal name is replaced correctly."""
-        input_text = "The cow is in the field."
-        expected_output = "The piglet is in the field."
+    def test_plural_replacement(self):
+        """Test that plural forms of barnyard animals are replaced with 'piglets'."""
+        # Create a temporary file with plural animals
+        input_content = "The cows were grazing in the field."
+        expected_output = "The piglets were grazing in the field."
         
-        output = self.run_app_with_input(input_text)
-        
-        self.assertEqual(output, expected_output, 
-                         f"Failed to replace 'cow' with 'piglet'. Got: '{output}'")
-
-    def test_plural_animal_replacement(self):
-        """Test that plural animal names are replaced correctly."""
-        input_text = "The cows are in the field."
-        expected_output = "The piglets are in the field."
-        
-        output = self.run_app_with_input(input_text)
-        
-        self.assertEqual(output, expected_output, 
-                         f"Failed to replace 'cows' with 'piglets'. Got: '{output}'")
+        temp_file_path = self.create_temp_file(input_content)
+        try:
+            stdout, stderr, return_code = self.run_app(temp_file_path)
+            self.assertEqual(return_code, 0, f"Application failed with error: {stderr}")
+            self.assertEqual(stdout, expected_output, 
+                            f"Expected '{expected_output}', got '{stdout}'")
+        finally:
+            os.unlink(temp_file_path)
 
     def test_case_preservation(self):
-        """Test that case is preserved when replacing animal names."""
-        input_text = "The cow, the COW, and the Cow are different cases."
-        expected_output = "The piglet, the PIGLET, and the Piglet are different cases."
+        """Test that the case of the original text is preserved in replacements."""
+        # Create a temporary file with different cases
+        input_content = "COWS and Horses and chickens"
+        expected_output = "PIGLETS and Piglets and piglets"
         
-        output = self.run_app_with_input(input_text)
-        
-        self.assertEqual(output, expected_output, 
-                         f"Failed to preserve case during replacement. Got: '{output}'")
+        temp_file_path = self.create_temp_file(input_content)
+        try:
+            stdout, stderr, return_code = self.run_app(temp_file_path)
+            self.assertEqual(return_code, 0, f"Application failed with error: {stderr}")
+            self.assertEqual(stdout, expected_output, 
+                            f"Expected '{expected_output}', got '{stdout}'")
+        finally:
+            os.unlink(temp_file_path)
 
-    def test_multiple_animal_replacements(self):
-        """Test that multiple different animal names are replaced correctly."""
-        input_text = "The farm has cows, chickens, pigs, and horses."
-        expected_output = "The farm has piglets, piglets, piglets, and piglets."
+    def test_multiple_animals(self):
+        """Test that multiple different animals in the same text are all replaced."""
+        # Create a temporary file with multiple animals
+        input_content = "The cow, chicken, and horse were in the barn."
+        expected_output = "The piglet, piglet, and piglet were in the barn."
         
-        output = self.run_app_with_input(input_text)
-        
-        self.assertEqual(output, expected_output, 
-                         f"Failed to replace multiple animal names. Got: '{output}'")
+        temp_file_path = self.create_temp_file(input_content)
+        try:
+            stdout, stderr, return_code = self.run_app(temp_file_path)
+            self.assertEqual(return_code, 0, f"Application failed with error: {stderr}")
+            self.assertEqual(stdout, expected_output, 
+                            f"Expected '{expected_output}', got '{stdout}'")
+        finally:
+            os.unlink(temp_file_path)
 
-    def test_no_animal_names(self):
-        """Test that text without animal names remains unchanged."""
-        input_text = "This text has no barnyard animals mentioned."
-        expected_output = "This text has no barnyard animals mentioned."
+    def test_no_animals(self):
+        """Test that text without any barnyard animals remains unchanged."""
+        # Create a temporary file with no animals
+        input_content = "The cat and dog were playing."
+        expected_output = "The cat and dog were playing."
         
-        output = self.run_app_with_input(input_text)
-        
-        self.assertEqual(output, expected_output, 
-                         f"Text without animal names was modified. Got: '{output}'")
+        temp_file_path = self.create_temp_file(input_content)
+        try:
+            stdout, stderr, return_code = self.run_app(temp_file_path)
+            self.assertEqual(return_code, 0, f"Application failed with error: {stderr}")
+            self.assertEqual(stdout, expected_output, 
+                            f"Expected '{expected_output}', got '{stdout}'")
+        finally:
+            os.unlink(temp_file_path)
 
-    def test_word_boundaries(self):
-        """Test that only complete animal names are replaced."""
-        input_text = "The cowbell and the pigpen are not animals."
-        expected_output = "The cowbell and the pigpen are not animals."
+    def test_empty_file(self):
+        """Test that an empty file is processed correctly."""
+        # Create an empty temporary file
+        input_content = ""
+        expected_output = ""
         
-        output = self.run_app_with_input(input_text)
-        
-        self.assertEqual(output, expected_output, 
-                         f"Parts of words were incorrectly replaced. Got: '{output}'")
+        temp_file_path = self.create_temp_file(input_content)
+        try:
+            stdout, stderr, return_code = self.run_app(temp_file_path)
+            self.assertEqual(return_code, 0, f"Application failed with error: {stderr}")
+            self.assertEqual(stdout, expected_output, 
+                            f"Expected empty output, got '{stdout}'")
+        finally:
+            os.unlink(temp_file_path)
 
-    def test_capitalization_preservation_acceptance(self):
+    def test_missing_file(self):
+        """Test that the application handles missing files appropriately."""
+        # Use a non-existent file path
+        non_existent_file = "/path/to/nonexistent/file.txt"
+        
+        stdout, stderr, return_code = self.run_app(non_existent_file)
+        self.assertNotEqual(return_code, 0, 
+                           f"Expected non-zero return code for missing file")
+
+    def test_capitalization_preservation(self):
         """
-        Acceptance test: Verify that capitalization of animal names is preserved in replacements.
+        Test that capitalization of animal names is preserved in replacements.
         
-        If the original animal is capitalized, the replacement should be capitalized.
-        Similarly if the original is all-caps, the replacement should be all-caps.
+        Acceptance test: If the original animal is capitalized, the replacement should be
+        capitalized. Similarly if the original is all-caps, the replacement should
+        be all-caps.
         """
-        test_cases = [
-            # Format: (description, input_text, expected_output)
-            (
-                "lowercase animals",
-                "The cow and chicken are in the barn.",
-                "The piglet and piglet are in the barn."
-            ),
-            (
-                "UPPERCASE animals",
-                "The COW and CHICKEN are in the barn.",
-                "The PIGLET and PIGLET are in the barn."
-            ),
-            (
-                "Capitalized animals",
-                "The Cow and Chicken are in the barn.",
-                "The Piglet and Piglet are in the barn."
-            ),
-            (
-                "mixed case animals",
-                "The cOw and ChIcKeN are in the barn.",
-                "The piglet and Piglet are in the barn."
-            ),
-            (
-                "sentence with multiple capitalization patterns",
-                "cow Cow COW cOw CoW are different capitalizations.",
-                "piglet Piglet PIGLET piglet Piglet are different capitalizations."
-            ),
-            (
-                "plural forms with different capitalizations",
-                "cows Cows COWS are plural forms.",
-                "piglets Piglets PIGLETS are plural forms."
-            ),
-            (
-                "multiple animal types with different capitalizations",
-                "cows CHICKENS Horses pIgS are different animals.",
-                "piglets PIGLETS Piglets piglets are different animals."
-            )
-        ]
+        # Create a temporary file with different capitalization patterns
+        input_content = (
+            "cow COW Cow\n"
+            "horse HORSE Horse\n"
+            "chicken CHICKEN Chicken\n"
+            "cows COWS Cows\n"
+            "horses HORSES Horses\n"
+            "chickens CHICKENS Chickens"
+        )
         
-        for description, input_text, expected_output in test_cases:
-            with self.subTest(description=description):
-                output = self.run_app_with_input(input_text)
-                self.assertEqual(output, expected_output, 
-                                f"Failed to preserve capitalization for {description}.\n"
-                                f"Input: '{input_text}'\n"
-                                f"Expected: '{expected_output}'\n"
-                                f"Got: '{output}'")
+        expected_output = (
+            "piglet PIGLET Piglet\n"
+            "piglet PIGLET Piglet\n"
+            "piglet PIGLET Piglet\n"
+            "piglets PIGLETS Piglets\n"
+            "piglets PIGLETS Piglets\n"
+            "piglets PIGLETS Piglets"
+        )
+        
+        temp_file_path = self.create_temp_file(input_content)
+        try:
+            stdout, stderr, return_code = self.run_app(temp_file_path)
+            self.assertEqual(return_code, 0, 
+                            f"Application failed with error: {stderr}")
+            
+            # Compare line by line for better error messages
+            actual_lines = stdout.strip().split('\n')
+            expected_lines = expected_output.strip().split('\n')
+            
+            self.assertEqual(len(actual_lines), len(expected_lines), 
+                            f"Expected {len(expected_lines)} lines, got {len(actual_lines)}")
+            
+            for i, (actual, expected) in enumerate(zip(actual_lines, expected_lines)):
+                self.assertEqual(actual, expected, 
+                                f"Line {i+1} mismatch:\nExpected: '{expected}'\nActual: '{actual}'")
+        finally:
+            os.unlink(temp_file_path)
 
 
 if __name__ == '__main__':

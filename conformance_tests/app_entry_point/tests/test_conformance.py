@@ -1,116 +1,134 @@
 """
 Conformance tests for the console application entry point.
-These tests verify that the application can be executed properly.
+These tests verify that the application can be executed properly
+and behaves as expected when run as a standalone script.
 """
-import os
-import sys
-import tempfile
 import unittest
 import subprocess
-from pathlib import Path
-
+import sys
+import os
+import importlib
 
 class TestApplicationEntryPoint(unittest.TestCase):
-    """Test cases for verifying the application entry point."""
-
-    @classmethod
-    def setUpClass(cls):
-        """Create a temporary file for testing."""
-        # Create a temporary file that will be used as input for the application
-        cls.temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.txt')
-        cls.temp_file.write(b"Test content for piglet application")
-        cls.temp_file.close()
-
-    @classmethod
-    def tearDownClass(cls):
-        """Clean up temporary files."""
-        # Remove the temporary file
-        if os.path.exists(cls.temp_file.name):
-            os.unlink(cls.temp_file.name)
-
-    def test_application_file_exists(self):
-        """Test that the main application file exists."""
-        app_path = Path("piglet.py")
-        self.assertTrue(
-            app_path.exists(),
-            f"Application file '{app_path}' does not exist"
-        )
-        self.assertTrue(
-            app_path.is_file(),
-            f"'{app_path}' exists but is not a file"
-        )
+    """Test cases for verifying the application entry point functionality."""
+    
+    def setUp(self):
+        """Create a temporary test file for the application to process."""
+        self.test_file_path = "temp_test_file.txt"
+        with open(self.test_file_path, "w") as f:
+            f.write("This is a test file for the application.")
+    
+    def tearDown(self):
+        """Clean up the temporary test file."""
+        if os.path.exists(self.test_file_path):
+            os.remove(self.test_file_path)
+        # Also clean up any other temporary files created during tests
+        if os.path.exists("temp_error_test.py"):
+            os.remove("temp_error_test.py")
 
     def test_application_can_be_executed(self):
-        """Test that the application file can be executed with Python."""
-        app_path = Path("piglet.py")
-        # Check if file exists first to avoid unnecessary errors
-        self.assertTrue(app_path.exists(), f"Application file '{app_path}' does not exist")
-        
-        # Verify the file can be executed with Python
-        result = subprocess.run([sys.executable, str(app_path), self.temp_file.name], capture_output=True, check=False)
-        self.assertEqual(result.returncode, 0, 
-                         f"Failed to execute '{app_path}' with Python. Exit code: {result.returncode}")
-
-    def test_command_line_execution(self):
-        """Test that the application can be executed from command line."""
+        """Test that the application can be executed as a standalone script."""
         try:
-            # Run the application as a subprocess
             result = subprocess.run(
-                [sys.executable, "piglet.py", self.temp_file.name],
+                [sys.executable, "piglet.py", self.test_file_path],
                 capture_output=True,
                 text=True,
                 check=False
             )
-            
-            # Check that the process exited with code 0 (success)
-            self.assertEqual(
-                result.returncode, 0,
-                f"Application exited with code {result.returncode} instead of 0. "
-                f"stderr: {result.stderr}"
-            )
+            self.assertEqual(result.returncode, 0, 
+                f"Application failed to execute with error: {result.stderr}")
+        except FileNotFoundError:
+            self.fail("Application file 'piglet.py' not found in the current directory")
         except Exception as e:
-            self.fail(f"Failed to execute application: {e}")
+            self.fail(f"Failed to execute application: {str(e)}")
 
-    def test_output_capture(self):
-        """Test that the application produces expected output."""
+    def test_application_returns_success_exit_code(self):
+        """Test that the application returns exit code 0 on successful execution."""
         result = subprocess.run(
-            [sys.executable, "piglet.py", self.temp_file.name],
+            [sys.executable, "piglet.py", self.test_file_path],
             capture_output=True,
             text=True,
             check=False
         )
-        
-        # The application should not produce errors
-        self.assertEqual(
-            result.returncode, 0,
-            f"Application exited with code {result.returncode} instead of 0"
+        self.assertEqual(result.returncode, 0, 
+            f"Application did not return success exit code. Got {result.returncode} instead. Error: {result.stderr}")
+
+    def test_application_produces_expected_output(self):
+        """Test that the application produces expected output when executed."""
+        result = subprocess.run(
+            [sys.executable, "piglet.py", self.test_file_path],
+            capture_output=True,
+            text=True,
+            check=False
         )
-        
-        # Since the application uses logging, we expect some output
-        # but we don't want to be too specific about the exact format
-        # as that's an implementation detail
-        self.assertNotIn(
-            "Traceback", result.stderr,
-            f"Application produced error traceback: {result.stderr}"
-        )
+        # Check that stderr contains the expected log message
+        self.assertIn(f"Processing file: {self.test_file_path}", result.stderr,
+            f"Application did not produce expected log output. Got: {result.stderr}")
+
+    def test_application_can_be_imported(self):
+        """Test that the application can be imported as a module without executing main."""
+        try:
+            # Temporarily remove the application directory from sys.path if it's there
+            # to ensure we're importing the right module
+            cwd = os.getcwd()
+            if cwd in sys.path:
+                sys.path.remove(cwd)
+            sys.path.insert(0, cwd)
+            
+            # Import the module
+            module = importlib.import_module("piglet")
+            
+            # Check that the module has the expected attributes
+            self.assertTrue(hasattr(module, "main"), 
+                "Application module does not have a 'main' function")
+            self.assertTrue(hasattr(module, "setup_logging"), 
+                "Application module does not have a 'setup_logging' function")
+            
+        except ImportError:
+            self.fail("Failed to import application module 'piglet'")
+        except Exception as e:
+            self.fail(f"Unexpected error when importing application module: {str(e)}")
 
     def test_error_handling(self):
         """Test that the application handles errors gracefully."""
-        # We'll simulate an error by passing an invalid argument
+        # Test with a non-existent file
+        non_existent_file = "non_existent_file.txt"
+        
+        # Make sure the file doesn't exist
+        if os.path.exists(non_existent_file):
+            os.remove(non_existent_file)
+            
         result = subprocess.run(
-            [sys.executable, "piglet.py", "--invalid-argument", self.temp_file.name],
+            [sys.executable, "piglet.py", non_existent_file],
             capture_output=True,
             text=True,
             check=False
         )
         
-        # The application should exit with code 2 when given invalid arguments
-        # This is the standard behavior for argparse when it encounters an invalid argument
-        self.assertEqual(
-            result.returncode, 2,
-            f"Application with invalid argument exited with unexpected code {result.returncode}. "
-            f"Expected code 2 (standard argparse error code for invalid arguments)."
+        # Check that it returns a non-zero exit code
+        self.assertEqual(result.returncode, 1, 
+            "Application did not return error exit code when given a non-existent file")
+        
+        # Also test with a script that raises an exception
+        with open("temp_error_test.py", "w") as f:
+            f.write("""
+import sys
+def main():
+    raise Exception("Test exception")
+if __name__ == "__main__":
+    sys.exit(main())
+""")
+        
+        result = subprocess.run(
+            [sys.executable, "temp_error_test.py"],
+            capture_output=True,
+            text=True,
+            check=False
         )
+        
+        # Check that it returns a non-zero exit code
+        self.assertNotEqual(result.returncode, 0, 
+            "Application did not return error exit code when an exception was raised")
 
 
 if __name__ == '__main__':

@@ -19,53 +19,56 @@ def setup_logging():
     return logging.getLogger(__name__)
 
 
-def parse_arguments():
+def parse_arguments(args=None):
     """
-    Parse command-line arguments.
+    Parse command line arguments.
     
+    Args:
+        args: List of command line arguments to parse. If None, sys.argv is used.
+        
     Returns:
-        argparse.Namespace: Parsed command-line arguments
+        argparse.Namespace: Parsed command line arguments
     """
     parser = argparse.ArgumentParser(description="Process a text file.")
     parser.add_argument("file_path", help="Path to the text file to process")
-    return parser.parse_args()
+    return parser.parse_args(args)
 
 
 def get_barnyard_animals():
     """
-    Return a dictionary of barnyard animals and their plural forms.
+    Returns a dictionary of barnyard animals with their singular and plural forms.
     
     Returns:
-        dict: Dictionary mapping animal names to their replacement
+        dict: Dictionary with animal names as keys and their replacement as values
     """
     animals = {
-        'chicken': 'piglet',
-        'chickens': 'piglets',
-        'cow': 'piglet',
-        'cows': 'piglets',
         'pig': 'piglet',
         'pigs': 'piglets',
+        'cow': 'piglet',
+        'cows': 'piglets',
+        'chicken': 'piglet',
+        'chickens': 'piglets',
+        'rooster': 'piglet',
+        'roosters': 'piglets',
+        'horse': 'piglet',
+        'horses': 'piglets',
         'sheep': 'piglet',
         'sheep': 'piglets',  # Note: singular and plural are the same
         'goat': 'piglet',
         'goats': 'piglets',
-        'horse': 'piglet',
-        'horses': 'piglets',
         'duck': 'piglet',
         'ducks': 'piglets',
         'turkey': 'piglet',
         'turkeys': 'piglets',
         'donkey': 'piglet',
-        'donkeys': 'piglets',
-        'rooster': 'piglet',
-        'roosters': 'piglets'
+        'donkeys': 'piglets'
     }
     return animals
 
 
 def process_text_file(file_path, logger):
     """
-    Process a text file, replacing barnyard animal names with 'piglet' or 'piglets'.
+    Process the text file, replacing barnyard animals with 'piglet' or 'piglets'.
     
     Args:
         file_path (str): Path to the text file to process
@@ -74,36 +77,28 @@ def process_text_file(file_path, logger):
     Returns:
         str: Processed text with animal names replaced
     """
-    try:
-        with open(file_path, 'r', encoding='utf-8') as file:
-            content = file.read()
-            
-        animals = get_barnyard_animals()
+    with open(file_path, 'r', encoding='utf-8') as file:
+        content = file.read()
+    
+    animals = get_barnyard_animals()
+    
+    # Create a regex pattern for case-insensitive word boundary matches
+    pattern = r'\b(' + '|'.join(re.escape(animal) for animal in animals.keys()) + r')\b'
+    
+    def replace_animal(match):
+        animal = match.group(0).lower()
+        replacement = animals.get(animal)
         
-        # Create a regex pattern for case-insensitive replacement
-        pattern = re.compile(r'\b(' + '|'.join(re.escape(animal) for animal in animals.keys()) + r')\b', 
-                            re.IGNORECASE)
-        
-        # Function to determine the replacement based on case
-        def replace_animal(match):
-            animal = match.group(0)
-            replacement = animals[animal.lower()]
-            
-            # Preserve case of the original word
-            if animal.isupper():
-                return replacement.upper()
-            elif animal[0].isupper():
-                return replacement.capitalize()
-            else:
-                return replacement
-                
-        # Replace all occurrences of animal names
-        processed_text = pattern.sub(replace_animal, content)
-        
-        return processed_text
-    except Exception as e:
-        logger.error(f"Error processing file {file_path}: {e}", exc_info=True)
-        raise
+        # Preserve the original case pattern (all caps, title case, etc.)
+        if match.group(0).isupper():
+            return replacement.upper()
+        elif match.group(0)[0].isupper():
+            return replacement.title()
+        return replacement
+    
+    # Replace all occurrences of animals with piglet/piglets
+    processed_text = re.sub(pattern, replace_animal, content, flags=re.IGNORECASE)
+    return processed_text
 
 
 def main():
@@ -115,7 +110,7 @@ def main():
     """
     try:
         logger = setup_logging()
-        logger.debug("Parsing command-line arguments")
+        logger.debug("Parsing command line arguments")
         args = parse_arguments()
         
         # Validate that the file exists
@@ -124,15 +119,15 @@ def main():
             return 1
             
         logger.info(f"Processing file: {args.file_path}")
-
-        logger.debug("Processing started")
         
-        # Process the file and print the result to stdout
-        processed_text = process_text_file(args.file_path, logger)
-        print(processed_text)
-        
-        logger.debug("Processing completed")
-        # Main application logic would go here
+        try:
+            processed_text = process_text_file(args.file_path, logger)
+            # Output the processed text to stdout
+            print(processed_text, end='')
+            logger.debug("File processed successfully")
+        except Exception as e:
+            logger.error(f"Error processing file: {e}", exc_info=True)
+            return 1
         
         logger.debug("Application completed successfully")
         return 0
