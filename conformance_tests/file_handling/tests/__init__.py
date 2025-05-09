@@ -1,3 +1,1 @@
-"""
-Test package for piglet application.
-"""
+# Make tests package discoverable

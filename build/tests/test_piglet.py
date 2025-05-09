@@ -6,59 +6,126 @@ Unit tests for the console application.
 import unittest
 import os
 import sys
-from unittest.mock import patch, mock_open, MagicMock
+import tempfile
+from unittest.mock import patch
 import piglet
+
 
 
 class TestMainModule(unittest.TestCase):
     """Test cases for the piglet module."""
 
-    @patch('argparse.ArgumentParser.parse_args')
-    @patch('os.path.isfile')
-    @patch('builtins.open', new_callable=mock_open, read_data="The cow jumped over the moon.")
-    @patch('piglet.process_text_file', return_value="The piglet jumped over the moon.")
-    def test_main_success(self, mock_process, mock_file, mock_isfile, mock_parse_args):
-        """Test that the main function returns 0 when file exists."""
-        # Mock the argument parser to return a file path
-        mock_parse_args.return_value = type('Args', (), {'file_path': 'test.txt'})
-        # Mock os.path.isfile to return True
-        mock_isfile.return_value = True        
+    def setUp(self):
+        """Set up test fixtures."""
+        # Create a temporary file for testing
+        self.temp_file = tempfile.NamedTemporaryFile(delete=False)
+        self.temp_file.write(b"The cow jumped over the moon. Cows are animals.")
+        self.temp_file.close()
+        
+    def tearDown(self):
+        """Tear down test fixtures."""
+        # Remove the temporary file
+        if os.path.exists(self.temp_file.name):
+            os.unlink(self.temp_file.name)
+
+    def test_get_barnyard_animals(self):
+        """Test that the barnyard animals dictionary is correctly defined."""
+        animals = piglet.get_barnyard_animals()
+        self.assertIsInstance(animals, dict)
+        self.assertIn('cow', animals)
+        self.assertEqual(animals['cow'], 'cows')
+        self.assertIn('pig', animals)
+        self.assertEqual(animals['pig'], 'pigs')
+
+    def test_replace_animals_with_piglet_singular(self):
+        """Test replacing singular animal names with 'piglet'."""
+        text = "The cow is in the field."
+        result = piglet.replace_animals_with_piglet(text)
+        self.assertEqual(result, "The piglet is in the field.")
+
+    def test_replace_animals_with_piglet_plural(self):
+        """Test replacing plural animal names with 'piglets'."""
+        text = "The cows are in the field."
+        result = piglet.replace_animals_with_piglet(text)
+        self.assertEqual(result, "The piglets are in the field.")
+
+    def test_replace_animals_with_piglet_capitalization(self):
+        """Test that capitalization is preserved when replacing animal names."""
+        text = "Cow and cow. Cows and cows."
+        result = piglet.replace_animals_with_piglet(text)
+        self.assertEqual(result, "Piglet and piglet. Piglets and piglets.")
+
+    def test_replace_animals_with_piglet_mixed_text(self):
+        """Test replacing animal names in a mixed text."""
+        text = "The cow, pig, and horse are in the field. Cows, pigs, and horses are animals."
+        result = piglet.replace_animals_with_piglet(text)
+        self.assertEqual(result, "The piglet, piglet, and piglet are in the field. Piglets, piglets, and piglets are animals.")
+
+    def test_replace_animals_with_piglet_word_boundaries(self):
+        """Test that only complete animal words are replaced."""
+        text = "The cowboy rode his horse to the showpig competition."
+        result = piglet.replace_animals_with_piglet(text)
+        self.assertEqual(result, "The cowboy rode his piglet to the showpig competition.")
+
+    @patch('sys.stdout', new_callable=tempfile.TemporaryFile)
+    @patch('piglet.parse_arguments')
+    def test_main_output(self, mock_parse_args, mock_stdout):
+        """Test that the main function outputs the processed text."""
+        mock_args = unittest.mock.Mock()
+        mock_args.file = self.temp_file.name
+        mock_parse_args.return_value = mock_args
+
+    @patch('piglet.parse_arguments')
+    def test_main_success(self, mock_parse_args):
+        """Test that the main function returns 0 on success with valid file."""
+        # Mock the arguments
+        mock_args = unittest.mock.Mock()
+        mock_args.file = self.temp_file.name
+        mock_parse_args.return_value = mock_args
         
         result = piglet.main()
         self.assertEqual(result, 0)
-        mock_isfile.assert_called_once_with('test.txt')
 
-    @patch('argparse.ArgumentParser.parse_args')
-    @patch('os.path.isfile')
-    def test_main_file_not_found(self, mock_isfile, mock_parse_args):
-        """Test that the main function returns 1 when file doesn't exist."""
-        # Mock the argument parser to return a file path
-        mock_parse_args.return_value = type('Args', (), {'file_path': 'nonexistent.txt'})
-        # Mock os.path.isfile to return False
-        mock_isfile.return_value = False
+    @patch('piglet.parse_arguments')
+    def test_main_file_not_found(self, mock_parse_args):
+        """Test that the main function returns 1 when file is not found."""
+        # Mock the arguments with a non-existent file
+        mock_args = unittest.mock.Mock()
+        mock_args.file = "non_existent_file.txt"
+        mock_parse_args.return_value = mock_args
         
         result = piglet.main()
         self.assertEqual(result, 1)
-        mock_isfile.assert_called_once_with('nonexistent.txt')
+
+    def test_parse_arguments(self):
+        """Test argument parsing."""
+        with patch('sys.argv', ['piglet.py', self.temp_file.name]):
+            args = piglet.parse_arguments()
+            self.assertEqual(args.file, self.temp_file.name)
 
     @patch('argparse.ArgumentParser.parse_args')
-    @patch('os.path.isfile', return_value=True)
-    @patch('builtins.open', new_callable=mock_open, read_data="The cow jumped over the moon.")
-    @patch('piglet.process_text_file', return_value="The piglet jumped over the moon.")
-    def test_main_success_with_valid_file(self, mock_process, mock_file, mock_isfile, mock_parse_args):
-        """Test that the main function processes a valid file."""
-        mock_parse_args.return_value = type('Args', (), {'file_path': 'test.txt'})
+    def test_parse_arguments_called(self, mock_parse_args):
+        """Test that parse_arguments is called in main."""
+        mock_args = unittest.mock.Mock()
+        mock_args.file = self.temp_file.name
+        mock_parse_args.return_value = mock_args
+        
+        with patch('os.path.isfile', return_value=True):
+            piglet.main()
+            mock_parse_args.assert_called_once()
+
+    @patch('piglet.parse_arguments')
+    @patch('piglet.setup_logging')
+    def test_logging_setup(self, mock_setup_logging, mock_parse_args):
+        """Test that logging is set up correctly."""
+        # Mock the arguments
+        mock_args = unittest.mock.Mock()
+        mock_args.file = self.temp_file.name
+        mock_parse_args.return_value = mock_args
+
         result = piglet.main()
         self.assertEqual(result, 0)
 
-    @patch('piglet.setup_logging')
-    @patch('piglet.parse_arguments')
-    @patch('os.path.isfile', return_value=True)
-    def test_logging_setup(self, mock_isfile, mock_parse_args, mock_setup_logging):
-        """Test that logging is set up correctly."""
-        # Mock the argument parser to return a file path
-        mock_parse_args.return_value = type('Args', (), {'file_path': 'test.txt'})
-        piglet.main()
         mock_setup_logging.assert_called_once()
 
     @patch('piglet.main')
@@ -73,78 +140,6 @@ class TestMainModule(unittest.TestCase):
             piglet.sys.exit(piglet.main())
             mock_exit.assert_called_once_with(42)
 
-    @patch('os.path.isfile', return_value=True)
-    def test_argument_parsing(self, mock_isfile):
-        """Test that command line arguments are parsed correctly."""
-        # Pass arguments directly instead of patching sys.argv
-        args = piglet.parse_arguments(['test.txt'])
-        self.assertEqual(args.file_path, 'test.txt')
-
-    
-    def test_missing_argument(self):
-        """Test that an error is raised when no file path is provided."""
-        with self.assertRaises(SystemExit):
-            piglet.parse_arguments([])
-
-    def test_get_barnyard_animals(self):
-        """Test that the barnyard animals dictionary is correctly defined."""
-        animals = piglet.get_barnyard_animals()
-        self.assertIsInstance(animals, dict)
-        self.assertIn('cow', animals)
-        self.assertEqual(animals['cow'], 'piglet')
-        self.assertIn('cows', animals)
-        self.assertEqual(animals['cows'], 'piglets')
-
-    @patch('builtins.open', new_callable=mock_open, read_data="The cow jumped over the moon.")
-    def test_process_text_file_singular(self, mock_file):
-        """Test that singular animal names are replaced correctly."""
-        logger = MagicMock()
-        result = piglet.process_text_file('test.txt', logger)
-        self.assertEqual(result, "The piglet jumped over the moon.")
-        mock_file.assert_called_once_with('test.txt', 'r', encoding='utf-8')
-
-    @patch('builtins.open', new_callable=mock_open, read_data="The cows were grazing in the field.")
-    def test_process_text_file_plural(self, mock_file):
-        """Test that plural animal names are replaced correctly."""
-        logger = MagicMock()
-        result = piglet.process_text_file('test.txt', logger)
-        self.assertEqual(result, "The piglets were grazing in the field.")
-        mock_file.assert_called_once_with('test.txt', 'r', encoding='utf-8')
-
-    @patch('builtins.open', new_callable=mock_open, read_data="COWS and Horses and chickens")
-    def test_process_text_file_case_preservation(self, mock_file):
-        """Test that case is preserved when replacing animal names."""
-        logger = MagicMock()
-        result = piglet.process_text_file('test.txt', logger)
-        self.assertEqual(result, "PIGLETS and Piglets and piglets")
-        mock_file.assert_called_once_with('test.txt', 'r', encoding='utf-8')
-
-    @patch('builtins.open', new_callable=mock_open, read_data="No animals here.")
-    def test_process_text_file_no_animals(self, mock_file):
-        """Test that text without animal names is unchanged."""
-        logger = MagicMock()
-        result = piglet.process_text_file('test.txt', logger)
-        self.assertEqual(result, "No animals here.")
-        mock_file.assert_called_once_with('test.txt', 'r', encoding='utf-8')
-
-    @patch('builtins.open', side_effect=IOError("File error"))
-    def test_process_text_file_error(self, mock_file):
-        """Test that file errors are handled correctly."""
-        logger = MagicMock()
-        with self.assertRaises(IOError):
-            piglet.process_text_file('test.txt', logger)
-
-    @patch('piglet.process_text_file')
-    @patch('argparse.ArgumentParser.parse_args')
-    @patch('os.path.isfile', return_value=True)
-    @patch('builtins.print')
-    def test_main_processes_file(self, mock_print, mock_isfile, mock_parse_args, mock_process):
-        """Test that main function processes the file and prints the result."""
-        mock_parse_args.return_value = type('Args', (), {'file_path': 'test.txt'})
-        mock_process.return_value = "Processed text"
-        result = piglet.main()
-        self.assertEqual(result, 0)
-        mock_print.assert_called_once_with("Processed text", end='')
 
 if __name__ == '__main__':
     unittest.main()

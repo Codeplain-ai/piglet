@@ -1,4 +1,2 @@
-"""
-Test package for the console application.
-This file makes the tests discoverable by unittest.
-"""
+# This file makes the tests directory a Python package
+# so that unittest discover can find the tests
