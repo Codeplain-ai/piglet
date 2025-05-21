@@ -11,7 +11,7 @@
 
 - The App should take a file name of The Text File as the only positional argument.
 
-- The App should load The Text File and replace all occurances of barnyard animals with the word "piglet" and output the updated text to the standard output. The plural forms of the barnyard animals should be replaced with the word "piglets". You should keep the original capitalization pattern.
+- The App should load The Text File and replace all occurrences of barnyard animals with the word "piglet" and output the updated text to the standard output. The plural forms of the barnyard animals should be replaced with the word "piglets". You should keep the original capitalization pattern.
 
   ***Acceptance Tests:***
   
