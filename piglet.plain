@@ -1,6 +1,6 @@
 {% include "python-console-app-template.plain", main_executable_file_name: "piglet.py" %}
 
-#  Piglet example
+>  Piglet example
 
 ***Definitions:***
 
